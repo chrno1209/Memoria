@@ -26,15 +26,15 @@ if(!$pathState){
 
 # find the game install location
 $appId = "377840";
-$gameInstalled = Test-Path -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App $($appId)"
-if(!$gameInstalled){
-    Write-Error "Final Fantasy IX is not installed via Steam we don't support piracy"
-    exit
-}
-$ff9InstallLoc = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App $($appId)"
+# $gameInstalled = Test-Path -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App $($appId)"
+# if(!$gameInstalled){
+#     Write-Error "Final Fantasy IX is not installed via Steam we don't support piracy"
+#     exit
+# }
+$ff9InstallLoc = "D:\Games\Final.Fantasy.IX.b5378074.2020_08_06\FINAL FANTASY IX"
 
 # copy files
-$filesPath = "$($ff9InstallLoc.InstallLocation)\x64\FF9_Data\Managed\"
+$filesPath = "$($ff9InstallLoc)\x64\FF9_Data\Managed\"
 $dest = Resolve-Path "./References/"
 
 get-childitem $filesPath -recurse | Where-Object {$_.extension -eq ".dll"} | ForEach-Object {

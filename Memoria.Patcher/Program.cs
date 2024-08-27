@@ -119,7 +119,7 @@ namespace Memoria.Patcher
                 else
                 {
                     // if the file is not signed
-                    inputFile.Seek(-0x18, SeekOrigin.End);
+                    inputFile.Seek(-3 * 8, SeekOrigin.End);
 
                     magicNumber = br.ReadInt64();
                     if (magicNumber != 0x004149524F4D454D)// MEMORIA\0 
