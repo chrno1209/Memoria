@@ -7,6 +7,31 @@ using Object = System.Object;
 
 public class EndGameMain : MonoBehaviour
 {
+    public static Dictionary<String, Sprite> SpriteAtlas;
+
+    static EndGameMain()
+    {
+        InitAtlas();
+    }
+
+    private static void InitAtlas()
+    {
+        // TODO: allow AssetManager.LoadFromDisc if a mod folder changes it
+        Sprite[] spriteList = Resources.LoadAll<Sprite>("EmbeddedAsset/EndGame/Card_Image");
+        SpriteAtlas = new Dictionary<String, Sprite>();
+        foreach (Sprite sprite in spriteList)
+            SpriteAtlas.Add(sprite.name, sprite);
+    }
+
+    public static Sprite GetSprite(String name)
+    {
+        if (!name.EndsWith(".png"))
+            name += ".png";
+        if (SpriteAtlas.TryGetValue(name, out Sprite sprite))
+            return sprite;
+        return null;
+    }
+
     private void Exit()
     {
         FF9Snd.ff9endsnd_song_vol_intpl(156, 60, 0);
@@ -123,7 +148,7 @@ public class EndGameMain : MonoBehaviour
         this.endGame.Start(this);
         this.bankRoll = EndGame.ff9endingGameBankroll;
         this.wager = this.endGame.ff9endingGameWager;
-        this.aspectFit = new AspectFit(1543f, 1080f, this.CanvasCamera);
+        this.aspectFit = new AspectFit(CANVAS_WIDTH, CANVAS_HEIGHT, this.CanvasCamera);
         this.CanvasPlane.GetComponent<Renderer>().material.SetColor("_Color", Color.black);
         RenderSettings.ambientLight = Color.white;
         if (PersistenSingleton<UIManager>.Instance.State == UIManager.UIState.Initial)
@@ -181,15 +206,8 @@ public class EndGameMain : MonoBehaviour
             "hearts",
             "spades"
         };
-        // Todo: allow AssetManager.LoadFromDisc if a mod folder changes it
-        Sprite[] array4 = Resources.LoadAll<Sprite>("EmbeddedAsset/EndGame/card_image");
-        Dictionary<String, Sprite> dictionary = new Dictionary<String, Sprite>();
-        Sprite[] array5 = array4;
-        for (Int32 i = 0; i < (Int32)array5.Length; i++)
-        {
-            Sprite sprite = array5[i];
-            dictionary.Add(sprite.name, sprite);
-        }
+        EndGameMain.InitAtlas();
+        Dictionary<String, Sprite> dictionary = EndGameMain.SpriteAtlas;
         this.GameCards = new List<List<GameObject>>();
         for (Int32 j = 0; j < 13; j++)
         {
@@ -363,11 +381,11 @@ public class EndGameMain : MonoBehaviour
             this.aspectFit.setAspectFit();
         }
         this.cumulativeDeltaTime += Time.deltaTime;
-        while (this.cumulativeDeltaTime >= 0.0166666675f)
+        while (this.cumulativeDeltaTime >= FRAME_TIME)
         {
             this.endGame.ResetFrameBasedRenderingObject();
             this.UpdateGameLogic();
-            this.cumulativeDeltaTime -= 0.0166666675f;
+            this.cumulativeDeltaTime -= FRAME_TIME;
         }
         this.endGame.ResetTimeBasedAnimation();
         this.endGame.UpdateTimeBasedAnimation(Time.deltaTime);
@@ -391,60 +409,34 @@ public class EndGameMain : MonoBehaviour
         }
     }
 
-    public const Single canvasWidth = 1543f;
-
-    public const Single canvasHeight = 1080f;
-
-    public const Single originalScreenWidth = 320f;
-
-    public const Single originalScreenHeight = 224f;
-
-    public const Single gameNormalizeTop = -5f;
-
-    public const Single gameNormalizeLeft = 5f;
-
-    public const Single gameNormalizeWidth = -10f;
-
-    public const Single gameNormalizeHeight = 10f;
-
-    public const Single Fps = 60f;
-
-    public const Single FrameTime = 0.0166666675f;
+    public const Single CANVAS_WIDTH = 1543f;
+    public const Single CANVAS_HEIGHT = 1080f;
+    public const Single FRAME_TIME = 0.0166666675f;
 
     public static EndGameMain Instance;
 
     public Camera CanvasCamera;
-
     public GameObject CanvasPlane;
 
     public EndGame endGame;
 
     public Int64 bankRoll;
-
     public Int64 wager;
 
     private AspectFit aspectFit;
 
     public List<GameObject> CardFaceDown;
-
     public List<GameObject> CardShoe;
-
     public List<List<GameObject>> GameCards;
-
     public List<Int32> InHandGameCardCounts;
 
     public EndGameScore endGameScore;
 
     public GameObject WinResult;
-
     public GameObject DrawResult;
-
     public GameObject LoseResult;
-
     public GameObject WinResultShadow;
-
     public GameObject DrawResultShadow;
-
     public GameObject LoseResultShadow;
 
     public List<GameObject> CardFaceDownMove;

@@ -68,11 +68,12 @@ public class btl_cmd
             cmd.reflec.tar_id[index] = 0;
     }
 
-    public static void InitCommandSystem(FF9StateBattleSystem btlsys)
+    public static void InitCommandSystem(FF9StateBattleSystem btlsys, Boolean isStart)
     {
         btlsys.cur_cmd_list.Clear();
         btlsys.cmd_status = 2;
-        btlsys.cmd_queue.regist = btlsys.cmd_escape.regist = null;
+        if (isStart)
+            btlsys.cmd_queue.regist = btlsys.cmd_escape.regist = null;
         ClearCommand(btlsys.cmd_queue);
         ClearCommand(btlsys.cmd_escape);
         btl_cmd.next_cmd_delay = 0;
@@ -429,26 +430,43 @@ public class btl_cmd
         CMD_DATA cmd = btlsys.cmd_queue.next;
         HashSet<BTL_DATA> busyCasters = new HashSet<BTL_DATA>();
         if (Configuration.Battle.Speed == 4)
-            for (BTL_DATA next = btlsys.btl_list.next; next != null; next = next.next)
-                if (btl_util.IsBtlBusy(next, btl_util.BusyMode.ANY_CURRENT))
-                    busyCasters.Add(next);
+            for (BTL_DATA btl = btlsys.btl_list.next; btl != null; btl = btl.next)
+                if (btl_util.IsBtlBusy(btl, btl_util.BusyMode.ANY_CURRENT))
+                    busyCasters.Add(btl);
+        Boolean hasPlayerAlive = false;
+        for (BTL_DATA btl = btlsys.btl_list.next; btl != null; btl = btl.next)
+        {
+            if (btl.bi.player != 0 && !btl_stat.CheckStatus(btl, BattleStatusConst.BattleEndFull))
+            {
+                hasPlayerAlive = true;
+                break;
+            }
+        }
         while (cmd != null)
         {
-            if (cmd.regist != null && busyCasters.Contains(cmd.regist) && cmd.cmd_no != BattleCommandId.SysPhantom
-                || btl_stat.CheckStatus(cmd.regist, BattleStatusConst.CannotAct) && cmd.cmd_no != BattleCommandId.SysDead && cmd.cmd_no != BattleCommandId.SysReraise && cmd.cmd_no != BattleCommandId.SysStone && cmd.cmd_no != BattleCommandId.SysEscape && cmd.cmd_no != BattleCommandId.SysLastPhoenix
-                || btl_stat.CheckStatus(cmd.regist, BattleStatus.Death) && cmd.cmd_no == BattleCommandId.SysPhantom
-                || Configuration.Battle.Speed >= 4 && btl_util.IsBtlUsingCommandMotion(cmd.regist)
-                || Configuration.Battle.Speed >= 5 && cmd.regist.bi.cover != 0)
+            if (cmd.regist != null)
             {
-                if (Configuration.Battle.Speed == 4)
+                if (busyCasters.Contains(cmd.regist) && cmd.cmd_no != BattleCommandId.SysPhantom
+                    || btl_stat.CheckStatus(cmd.regist, BattleStatusConst.CannotAct) && cmd.cmd_no != BattleCommandId.SysDead && cmd.cmd_no != BattleCommandId.SysReraise && cmd.cmd_no != BattleCommandId.SysStone && cmd.cmd_no != BattleCommandId.SysEscape && cmd.cmd_no != BattleCommandId.SysLastPhoenix
+                    || btl_stat.CheckStatus(cmd.regist, BattleStatus.Death) && cmd.cmd_no == BattleCommandId.SysPhantom
+                    || Configuration.Battle.Speed >= 4 && btl_util.IsBtlUsingCommandMotion(cmd.regist)
+                    || Configuration.Battle.Speed >= 5 && cmd.regist.bi.cover != 0)
                 {
-                    if (cmd.regist != null)
-                        busyCasters.Add(cmd.regist);
-                    foreach (BTL_DATA next in btl_util.findAllBtlData(cmd.tar_id))
-                        busyCasters.Add(next);
+                    if (Configuration.Battle.Speed == 4)
+                    {
+                        if (cmd.regist != null)
+                            busyCasters.Add(cmd.regist);
+                        foreach (BTL_DATA next in btl_util.findAllBtlData(cmd.tar_id))
+                            busyCasters.Add(next);
+                    }
+                    cmd = cmd.next;
+                    continue;
                 }
-                cmd = cmd.next;
-                continue;
+                if (!hasPlayerAlive && cmd.regist.bi.player == 0 && (cmd.cmd_no == BattleCommandId.EnemyAtk || cmd.cmd_no == BattleCommandId.EnemyCounter))
+                {
+                    cmd = cmd.next;
+                    continue;
+                }
             }
             break;
         }
@@ -497,12 +515,28 @@ public class btl_cmd
         else
         {
             // Default method
-            if (cmd.cmd_no < BattleCommandId.EnemyReaction || cmd.cmd_no > BattleCommandId.BoundaryUpperCheck)
+            if (cmd.regist != null && (cmd.cmd_no < BattleCommandId.EnemyReaction || cmd.cmd_no > BattleCommandId.BoundaryUpperCheck))
             {
                 BTL_DATA btl = cmd.regist;
                 if (btl_stat.CheckStatus(btl, BattleStatus.Heat))
                 {
-                    if (btl_stat.AlterStatus(new BattleUnit(btl), BattleStatusId.Death) == btl_stat.ALTER_SUCCESS)
+                    if (btl_stat.CheckStatus(btl, BattleStatus.EasyKill))
+                    {
+                        btl_para.SetLogicalHP(btl, 0, false);
+                        BattleVoice.TriggerOnStatusChange(btl, "Used", BattleStatusId.Heat);
+                        KillCommand(cmd);
+                        if (btl.cur.hp == 0 && btl.bi.player == 0) // Prevent dying animation for enemies
+                        {
+                            ENEMY enemy = btl_util.getEnemyPtr(btl);
+                            if (!enemy.info.die_atk)
+                            {
+                                btl_util.SetEnemyDieSound(btl, enemy.et.die_snd_no);
+                                btl.die_seq = 3;
+                            }
+                        }
+                        return;
+                    }
+                    else if (btl_stat.AlterStatus(new BattleUnit(btl), BattleStatusId.Death) == btl_stat.ALTER_SUCCESS)
                     {
                         BattleVoice.TriggerOnStatusChange(btl, "Used", BattleStatusId.Heat);
                         KillCommand(cmd);
@@ -655,7 +689,7 @@ public class btl_cmd
         return false;
     }
 
-    public static Boolean KillCommand2(BTL_DATA btl)
+    public static Boolean KillStandardCommands(BTL_DATA btl)
     {
         Boolean cancelMainCmd = false;
         btl.bi.cmd_idle = 0;
@@ -665,7 +699,7 @@ public class btl_cmd
             CMD_DATA cmd = parentCmd.next;
             if (cmd != null && cmd.regist == btl && (cmd.cmd_no < BattleCommandId.EnemyDying || cmd.cmd_no > BattleCommandId.BoundaryUpperCheck))
             {
-                if (btl_util.IsCommandDeclarable(cmd.cmd_no))
+                if (cmd == cmd.regist.cmd[0])
                     cancelMainCmd = true;
                 ResetItemCount(cmd);
                 DequeueCommand(parentCmd, true);
@@ -678,7 +712,7 @@ public class btl_cmd
         return cancelMainCmd;
     }
 
-    public static void KillCommand3(BTL_DATA btl)
+    public static void KillAllCommands(BTL_DATA btl)
     {
         CMD_DATA parentCmd = FF9StateSystem.Battle.FF9Battle.cmd_queue;
         while (parentCmd != null)
@@ -1189,6 +1223,10 @@ public class btl_cmd
                 forDead = cmd.aa.Info.ForDead;
                 break;
         }
+
+        if (BattleHUD.MixCommandSet.ContainsKey(cmd.cmd_no) && ff9mixitem.MixItemsData.TryGetValue(cmd.sub_no, out MixItems MixChoosen))
+            forDead = ff9item.GetItemEffect(MixChoosen.Result).info.ForDead;
+
         for (BTL_DATA btl = btlsys.btl_list.next; btl != null; btl = btl.next)
             if (btl.bi.target != 0 && (btl.btl_id & cmd.tar_id) != 0 && (forDead && btl.bi.player != 0 || !btl_stat.CheckStatus(btl, BattleStatus.Death)) && (!btl.out_of_reach || !cmd.IsShortRange))
                 validTarId |= btl.btl_id;
@@ -1374,7 +1412,7 @@ public class btl_cmd
 
     private static void ResetCurrentBattlerActiveTime(BattleUnit unit)
     {
-        if (Configuration.Fixes.IsKeepRestTimeInBattle && unit.MaximumAtb > 0)
+        if (Configuration.Battle.IsKeepRestTimeInBattle && unit.MaximumAtb > 0)
             unit.CurrentAtb = (Int16)Math.Max(0, unit.CurrentAtb - unit.MaximumAtb);
         else
             unit.CurrentAtb = 0;

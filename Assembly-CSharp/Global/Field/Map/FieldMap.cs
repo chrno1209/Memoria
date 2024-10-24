@@ -677,7 +677,18 @@ public class FieldMap : HonoBehavior
 
             Int32 threshmargin = Math.Min((Int32)bgCamera.w - PsxFieldWidth, 0); // Offset value for fields that are between 320 & 398
             //if (dbug) Log.Message("PsxFieldWidth" + PsxFieldWidth);
-            if (map == 1205 || map == 1652 || map == 2552 || map == 154 || map == 1215 || map == 1807 || map == 1055) // A. Castle/Chapel, Iifa Tree/Roots, Earth Shrine/Interior, Alex grand hall
+            //Log.Message("CamPositionY:" + CamPositionY + " this.charOffset.y:" + this.charOffset.y);
+
+            if ((map == 609 || map == 2159) && PersistenSingleton<EventEngine>.Instance.eBin.getVarManually(EBin.SC_COUNTER_SVR) != 3110)
+            {
+                CamPositionY = ((CamPositionY + 224f) * (CamPositionY + 224f) / 2f ) - 224f;
+                //Log.Message("NCamPositionY:" + CamPositionY + " this.charOffset.y:" + this.charOffset.y);
+            }
+            if (map == 507) // Cargo Ship/Deck
+            {
+                CamPositionX = CamPositionX + 1;
+            }
+            else if (map == 1205 || map == 1652 || map == 2552 || map == 154 || map == 1215 || map == 1807 || map == 1055) // A. Castle/Chapel, Iifa Tree/Roots, Earth Shrine/Interior, Alex grand hall
             {
                 if (map == 1652 && this.camIdx == 0) // Iifa Tree/Roots
                     threshmargin += 16;
@@ -689,7 +700,7 @@ public class FieldMap : HonoBehavior
                 CamPositionX = (float)Math.Max(threshmargin, CamPositionX);
                 CamPositionX = (float)Math.Min(threshright, CamPositionX);
             }
-            else if (mapWidth > PsxFieldWidth && map != 507) // Cargo Ship/Deck
+            else if (mapWidth > PsxFieldWidth)
             {
                 foreach (KeyValuePair<Int32, Int32> entry in NarrowMapList.mapCameraMargin)
                     if (map == entry.Key)
@@ -722,8 +733,6 @@ public class FieldMap : HonoBehavior
                     CamPositionX = Configuration.Graphics.ScreenIs16to10() ? 195 : 160; break;
                 case 505: // Cargo ship offset
                     CamPositionX = Configuration.Graphics.ScreenIs16to10() ? 70 : 105; break;
-                case 507: // Cargo ship offset (white line left)
-                    CamPositionX = CamPositionX + 1; break;
                 case 1153: // Rose Rouge cockpit offset
                     CamPositionX = Configuration.Graphics.ScreenIs16to10() ? 140 : 175; break;
                 case 2716: // fix for Kuja descending camera too high
@@ -1465,7 +1474,9 @@ public class FieldMap : HonoBehavior
 
         foreach (int[] entry in FixDepthOfLayer)
         {
-            if (entry[0] == FF9StateSystem.Common.FF9.fldMapNo && entry[1] == this.camIdx && entry[2] == ovrNdx)
+            if (Configuration.Graphics.TileSize == 32 && (entry[0] == 562 || entry[0] == 1309 || entry[0] == 2109))
+            { }
+            else if (entry[0] == FF9StateSystem.Common.FF9.fldMapNo && entry[1] == this.camIdx && entry[2] == ovrNdx)
             {
                 bgOverlay.curZ = (ushort)entry[3];
                 bgOverlay.transform.localPosition = new Vector3(bgOverlay.transform.localPosition.x, bgOverlay.transform.localPosition.y, entry[3]);
@@ -2187,7 +2198,7 @@ public class FieldMap : HonoBehavior
 
     public FieldMapEditor fmEditor;
 
-    private static readonly Dictionary<int, FieldMap.EbgCombineMeshData> combineMeshDict = new Dictionary<int, FieldMap.EbgCombineMeshData>
+    /*private static readonly Dictionary<int, FieldMap.EbgCombineMeshData> combineMeshDict = new Dictionary<int, FieldMap.EbgCombineMeshData>
     {
         {351, (FieldMap.EbgCombineMeshData)null},
         {358, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 13, 14 }}},
@@ -2277,7 +2288,7 @@ public class FieldMap : HonoBehavior
         {2906, (FieldMap.EbgCombineMeshData)null },
         {3100, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 38, 40, 46, 47, 48, 49, 50, 52 }}},
         {2107, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 0, 1, 2, 3, 4, 5, 12 }}}
-    };
+    };*/
 
     public static readonly List<String> fieldMapNameWithAreaTitle = new List<String>
     {
@@ -2454,12 +2465,12 @@ public class FieldMap : HonoBehavior
         [350,0,4,805],      // Dali shop door cropped
         [350,0,6,820],      // Dali shop door cropped
         [350,0,7,820],      // Dali shop door cropped
-        [350,0,26,1300],    // Dali windmill shadow cropped
-        [350,0,27,1300],    // Dali windmill shadow cropped
-        [350,0,28,1300],    // Dali windmill shadow cropped
-        [350,0,29,1300],    // Dali windmill shadow cropped
-        [350,0,30,1300],    // Dali windmill shadow cropped
-        [350,0,31,1300],    // Dali windmill shadow cropped
+        //[350,0,26,1300],    // Dali windmill shadow cropped
+        //[350,0,27,1300],    // Dali windmill shadow cropped
+        //[350,0,28,1300],    // Dali windmill shadow cropped
+        //[350,0,29,1300],    // Dali windmill shadow cropped
+        //[350,0,30,1300],    // Dali windmill shadow cropped
+        //[350,0,31,1300],    // Dali windmill shadow cropped
         [355,0,5,1880],     // Dali pub left light
         [403,0,23,560],     // Dali underground wall over box
         [403,0,27,1523],    // Dali underground barrel
@@ -2513,6 +2524,9 @@ public class FieldMap : HonoBehavior
         [2207,0,5,0],       // Desert palace teleporter light 5
         [2209,0,0,0],       // Desert palace teleporter light
         [2211,0,8,400],     // Desert palace teleporter light
+        [2217,0,1,1847],    // Candle light
+        [2217,0,6,3000],    // Candle light
+        [2217,0,8,5000],    // Candle light
         [2221,0,17,2200],   // Candle light
         [2222,0,2,1000],    // Desert palace teleporter light
         [2502,0,14,1400],   // Ypsen, entrance light
@@ -2529,7 +2543,7 @@ public class FieldMap : HonoBehavior
         [2600,0,13,8000],   // Branbal, background
         [2605,0,3,2200],    // Branbal, light of light net
         [2657,0,4,2040],    // Branbal, light in the room
-        [2800,0,26,1700],   // Dagguereo Zidane behind beckground on left path
+        //[2800,0,26,1700],   // Dagguereo Zidane behind beckground on left path
         [2922,0,8,4329],    // Crystal world (was not active on PSX)
         [2922,0,10,3179],   // Crystal world (was not active on PSX)
         [2922,0,11,3179],   // Crystal world (was not active on PSX)

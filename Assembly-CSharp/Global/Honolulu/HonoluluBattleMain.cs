@@ -454,7 +454,7 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
                     needContinue = false;
                 }
 
-                if (!Configuration.Fixes.IsKeepRestTimeInBattle)
+                if (!Configuration.Battle.IsKeepRestTimeInBattle)
                     current.at = maximum.at;
 
                 if (btl_stat.CheckStatus(btl, BattleStatusConst.PreventATBConfirm))
@@ -657,6 +657,7 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
         foreach (BattleCalculator calc in BattleCalculator.FrameAppliedEffectList)
             BattleHUD.EffectedBtlId |= calc.Target.Id;
         BattleCalculator.FrameAppliedEffectList.Clear();
+        btl_mot.BtlActivatedThisFrame.Clear();
     }
 
     private static void UpdateOverFrame()

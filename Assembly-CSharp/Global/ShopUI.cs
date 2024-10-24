@@ -214,6 +214,7 @@ public class ShopUI : UIScene
         }
         if (this.type != ShopUI.ShopType.Item)
             this.UpdatePartyInfo();
+        this.UpdateNavigateCharacterTooltip();
     }
 
     public override Boolean OnKeyConfirm(GameObject go)
@@ -315,7 +316,7 @@ public class ShopUI : UIScene
                 {
                     this.currentItemIndex = go.GetComponent<RecycleListItem>().ItemDataIndex;
                     RegularItem sellingItem = this.sellItemIdList[this.currentItemIndex];
-                    if (!this.soldItemIdDict.ContainsKey(sellingItem))
+                    if (!this.soldItemIdDict.ContainsKey(sellingItem) && ff9item._FF9Item_Data[sellingItem].selling_price >= 0)
                     {
                         FF9Sfx.FF9SFX_Play(103);
                         this.StartCountSell();
@@ -387,10 +388,15 @@ public class ShopUI : UIScene
                 }
                 else
                 {
-                    FF9Sfx.FF9SFX_Play(1045);
                     RegularItem sellingItem = this.sellItemIdList[this.currentItemIndex];
                     FF9ITEM_DATA item = ff9item._FF9Item_Data[sellingItem];
-                    UInt32 sellingPrice = item.price >> 1;
+                    Int32 sellingPrice = item.selling_price;
+                    if (sellingPrice < 0)
+                    {
+                        FF9Sfx.FF9SFX_Play(102);
+                        return true;
+                    }
+                    FF9Sfx.FF9SFX_Play(1045);
                     Int32 countRemoved = ff9item.FF9Item_Remove(sellingItem, this.count);
                     if (countRemoved != 0)
                     {
@@ -607,20 +613,24 @@ public class ShopUI : UIScene
 
     public override Boolean OnKeyLeftTrigger(GameObject go)
     {
-        if (this.availableCharaStart > 0)
+        if (this.charInfoHud[0].AvatarSprite.isActiveAndEnabled && this.availableCharaStart > 0)
         {
             this.availableCharaStart--;
             this.DisplayCharacterInfo();
+            this.UpdateNavigateCharacterTooltip();
+            FF9Sfx.FF9SFX_Play(103);
         }
         return true;
     }
 
     public override Boolean OnKeyRightTrigger(GameObject go)
     {
-        if (this.availableCharaStart + this.charInfoHud.Count < this.availableCharaList.Count)
+        if (this.charInfoHud[0].AvatarSprite.isActiveAndEnabled && this.availableCharaStart + this.charInfoHud.Count < this.availableCharaList.Count)
         {
             this.availableCharaStart++;
             this.DisplayCharacterInfo();
+            this.UpdateNavigateCharacterTooltip();
+            FF9Sfx.FF9SFX_Play(103);
         }
         return true;
     }
@@ -905,7 +915,7 @@ public class ShopUI : UIScene
         }
         if (this.shopSellItemScrollList.ItemsPool.Count == 0)
         {
-            this.shopSellItemScrollList.PopulateListItemWithData = new Action<Transform, ListDataTypeBase, Int32, Boolean>(this.DisplaySellItemDetail);
+            this.shopSellItemScrollList.PopulateListItemWithData = this.DisplaySellItemDetail;
             this.shopSellItemScrollList.OnRecycleListItemClick += this.OnListItemClick;
             this.shopSellItemScrollList.InitTableView(list, 0);
         }
@@ -923,9 +933,10 @@ public class ShopUI : UIScene
             this.DisplayWindowBackground(item.gameObject, null);
         if (shopSellItemListData.Count > 0)
         {
-            FF9UIDataTool.DisplayItem(shopSellItemListData.Id, itemListDetailWithIconHUD.IconSprite, itemListDetailWithIconHUD.NameLabel, true);
+            Boolean canSell = ff9item._FF9Item_Data[shopSellItemListData.Id].selling_price >= 0;
+            FF9UIDataTool.DisplayItem(shopSellItemListData.Id, itemListDetailWithIconHUD.IconSprite, itemListDetailWithIconHUD.NameLabel, canSell);
             itemListDetailWithIconHUD.NumberLabel.text = shopSellItemListData.Count.ToString();
-            itemListDetailWithIconHUD.NumberLabel.color = FF9TextTool.White;
+            itemListDetailWithIconHUD.NumberLabel.color = canSell ? FF9TextTool.White : FF9TextTool.Gray;
             ButtonGroupState.SetButtonAnimation(itemListDetailWithIconHUD.Self, true);
         }
         else
@@ -1013,6 +1024,13 @@ public class ShopUI : UIScene
                 characterWeaponInfoHUD.EquipmentTypeSprite.gameObject.SetActive(false);
             }
         }
+        if (this.NavigateCharacterLeftKey != null)
+        {
+            this.NavigateCharacterLeftKey.gameObject.SetActive(true);
+            this.NavigateCharacterLeftArrow.gameObject.SetActive(true);
+            this.NavigateCharacterRightKey.gameObject.SetActive(true);
+            this.NavigateCharacterRightArrow.gameObject.SetActive(true);
+        }
     }
 
     private void DisplayConfirmDialog(ShopUI.ShopType shopType)
@@ -1037,13 +1055,13 @@ public class ShopUI : UIScene
         }
         else
         {
+            RegularItem itemId = this.sellItemIdList[this.currentItemIndex];
+            Int32 sellingPrice = ff9item._FF9Item_Data[itemId].selling_price;
             this.InputQuantityDialog.SetActive(true);
             this.InputQuantityDialog.transform.localPosition = new Vector3(0f, 50f, 0f);
             FF9UIDataTool.DisplayTextLocalize(this.HelpLabel, "SellQtyHelp");
             this.InfoDialog.SetActive(true);
-            RegularItem itemId = this.sellItemIdList[this.currentItemIndex];
             FF9UIDataTool.DisplayItem(itemId, this.confirmItemHud.IconSprite, this.confirmItemHud.NameLabel, true);
-            UInt32 sellingPrice = ff9item._FF9Item_Data[itemId].price >> 1;
             this.confirmQuantityLabel.text = this.count.ToString();
             this.confirmPriceLabel.text = Localization.GetWithDefault("GilSymbol").Replace("%", (this.count * sellingPrice).ToString());
             Boolean isEquipment = (ff9item._FF9Item_Data[itemId].type & ItemType.AnyEquipment) != 0;
@@ -1074,6 +1092,13 @@ public class ShopUI : UIScene
             characterWeaponInfoHUD.ParamValueLabel.gameObject.SetActive(false);
             characterWeaponInfoHUD.ChangeArrowSprite.gameObject.SetActive(false);
             characterWeaponInfoHUD.EquipmentTypeSprite.gameObject.SetActive(false);
+        }
+        if (this.NavigateCharacterLeftKey != null)
+        {
+            this.NavigateCharacterLeftKey.gameObject.SetActive(false);
+            this.NavigateCharacterLeftArrow.gameObject.SetActive(false);
+            this.NavigateCharacterRightKey.gameObject.SetActive(false);
+            this.NavigateCharacterRightArrow.gameObject.SetActive(false);
         }
     }
 
@@ -1327,6 +1352,53 @@ public class ShopUI : UIScene
         }
     }
 
+    private void UpdateNavigateCharacterTooltip()
+    {
+        Boolean show = this.charInfoHud.Count < this.availableCharaList.Count;
+        if (show && this.NavigateCharacterLeftKey == null)
+        {
+            this.NavigateCharacterLeftKey = FF9UIDataTool.ButtonGameObject(Control.LeftTrigger, true, NGUIText.JoyStickButtonIcon).GetComponent<UISprite>();
+            this.NavigateCharacterLeftArrow = FF9UIDataTool.SpriteGameObject("IconAtlas", "arrow_left").GetComponent<UISprite>();
+            this.NavigateCharacterRightKey = FF9UIDataTool.ButtonGameObject(Control.RightTrigger, true, NGUIText.JoyStickButtonIcon).GetComponent<UISprite>();
+            this.NavigateCharacterRightArrow = FF9UIDataTool.SpriteGameObject("IconAtlas", "arrow_right").GetComponent<UISprite>();
+            FF9UIDataTool.TakeBitmapOwnership(this.NavigateCharacterLeftKey.gameObject);
+            FF9UIDataTool.TakeBitmapOwnership(this.NavigateCharacterLeftArrow.gameObject);
+            FF9UIDataTool.TakeBitmapOwnership(this.NavigateCharacterRightKey.gameObject);
+            FF9UIDataTool.TakeBitmapOwnership(this.NavigateCharacterRightArrow.gameObject);
+            UISprite leftPortrait = this.charInfoHud[0].AvatarSprite;
+            UISprite rightPortrait = this.charInfoHud[this.charInfoHud.Count - 1].AvatarSprite;
+            this.NavigateCharacterLeftKey.transform.parent = leftPortrait.transform.parent;
+            this.NavigateCharacterLeftArrow.transform.parent = leftPortrait.transform.parent;
+            this.NavigateCharacterRightKey.transform.parent = rightPortrait.transform.parent;
+            this.NavigateCharacterRightArrow.transform.parent = rightPortrait.transform.parent;
+            this.NavigateCharacterLeftKey.gameObject.SetActive(true);
+            this.NavigateCharacterLeftArrow.gameObject.SetActive(true);
+            this.NavigateCharacterRightKey.gameObject.SetActive(true);
+            this.NavigateCharacterRightArrow.gameObject.SetActive(true);
+            this.NavigateCharacterLeftKey.depth = leftPortrait.depth + 1;
+            this.NavigateCharacterLeftArrow.depth = leftPortrait.depth + 1;
+            this.NavigateCharacterRightKey.depth = rightPortrait.depth + 1;
+            this.NavigateCharacterRightArrow.depth = rightPortrait.depth + 1;
+            this.NavigateCharacterLeftKey.transform.localScale = Vector3.one;
+            this.NavigateCharacterLeftArrow.transform.localScale = Vector3.one;
+            this.NavigateCharacterRightKey.transform.localScale = Vector3.one;
+            this.NavigateCharacterRightArrow.transform.localScale = Vector3.one;
+            this.NavigateCharacterLeftKey.SetAnchor(leftPortrait.transform, 0f, 0.5f, 0f, 0.5f, -50, -25, 0, 25);
+            this.NavigateCharacterLeftArrow.SetAnchor(leftPortrait.transform, 0f, 0.5f, 0f, 0.5f, -70, -25, -30, 25);
+            this.NavigateCharacterRightKey.SetAnchor(rightPortrait.transform, 1f, 0.5f, 1f, 0.5f, 0, -25, 50, 25);
+            this.NavigateCharacterRightArrow.SetAnchor(rightPortrait.transform, 1f, 0.5f, 1f, 0.5f, 30, -25, 70, 25);
+        }
+        if (this.NavigateCharacterLeftKey != null)
+        {
+            Single alphaLeft = show ? (this.availableCharaStart > 0 ? 1f : 0.5f) : 0f;
+            Single alphaRight = show ? (this.availableCharaStart + this.charInfoHud.Count < this.availableCharaList.Count ? 1f : 0.5f) : 0f;
+            this.NavigateCharacterLeftKey.alpha = alphaLeft;
+            this.NavigateCharacterLeftArrow.alpha = alphaLeft;
+            this.NavigateCharacterRightKey.alpha = alphaRight;
+            this.NavigateCharacterRightArrow.alpha = alphaRight;
+        }
+    }
+
     private const Single TRIGGER_DURATION = 0.115f;
     private const Single CHANGE_QUANTITY_DURATION = 1f;
 
@@ -1416,6 +1488,15 @@ public class ShopUI : UIScene
     private Boolean isPlusQuantity;
     private Boolean isMinusQuantity;
     private Single keepPressingTime;
+
+    [NonSerialized]
+    public UISprite NavigateCharacterLeftKey = null;
+    [NonSerialized]
+    public UISprite NavigateCharacterLeftArrow = null;
+    [NonSerialized]
+    public UISprite NavigateCharacterRightKey = null;
+    [NonSerialized]
+    public UISprite NavigateCharacterRightArrow = null;
 
     private class CharacterWeaponInfoHUD
     {

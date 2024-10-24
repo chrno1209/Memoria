@@ -117,11 +117,11 @@ public partial class BattleHUD : UIScene
         }
         if (MixCommandSet.ContainsKey(pCmd.cmd_no) && ff9mixitem.MixItemsData.TryGetValue(pCmd.sub_no, out MixItems MixChoosen))
             return FF9TextTool.ItemName(MixChoosen.Result);
+        CharacterCommandType cmdType = btl_util.GetCommandTypeSafe(pCmd.cmd_no);
+        if (cmdType == CharacterCommandType.Item || cmdType == CharacterCommandType.Throw)
+            return FF9TextTool.ItemName((RegularItem)pCmd.sub_no);
         switch (pCmd.cmd_no)
         {
-            case BattleCommandId.Item:
-            case BattleCommandId.Throw:
-                return FF9TextTool.ItemName((RegularItem)pCmd.sub_no);
             case BattleCommandId.AutoPotion:
                 return String.Empty;
             case BattleCommandId.MagicCounter:
@@ -142,10 +142,6 @@ public partial class BattleHUD : UIScene
                         default:
                             return type < 192 ? FF9TextTool.ActionAbilityName((BattleAbilityId)type) : FF9TextTool.BattleCommandTitleText((type & 63) + 1);
                     }
-                }
-                else
-                {
-                    return FF9TextTool.ActionAbilityName(abilId);
                 }
                 break;
         }
@@ -349,7 +345,7 @@ public partial class BattleHUD : UIScene
 
     public BattleMagicSwordSet GetMagicSwordOfAbility(BattleUnit caster, Int32 abilId)
     {
-        if (caster.IsPlayer && _abilityDetailDict[caster.GetIndex()].AbilityMagicSet.TryGetValue(abilId, out BattleMagicSwordSet magicSet))
+        if (caster.IsPlayer && _abilityDetailDict.TryGetValue(caster.GetIndex(), out AbilityPlayerDetail detail) && detail.AbilityMagicSet.TryGetValue(abilId, out BattleMagicSwordSet magicSet))
             return magicSet;
         return null;
     }
@@ -443,6 +439,11 @@ public partial class BattleHUD : UIScene
             charDetail.MP.Label.SetAnchor(target: charDetail.Transform, relLeft: 0.59f, relRight: 0.71f);
             charDetail.ATBBar.Sprite.SetAnchor(target: charDetail.Transform, relLeft: 0.725f, relRight: 0.977f, relBottom: 0.55f, relTop: 0.78f);
             charDetail.TranceBar.Sprite.SetAnchor(target: charDetail.Transform, relLeft: 0.748f, relRight: 1f, relBottom: 0.28f, relTop: 0.52f);
+            if (Configuration.Interface.ThickerATBBar)
+            {
+                charDetail.ATBBar.Sprite.SetAnchor(charDetail.Transform, 0.725f, 0.65f, 0.975f, 0.8f, 0f, -5f, 0f, 10f); // made by Resinated
+                charDetail.TranceBar.Sprite.SetAnchor(charDetail.Transform, 0.75f, 0.25f, 1f, 0.4f, 0f, -5f, 0f, 10f);
+            }
         }
         _statusPanel.Transform.SetXY(detailPos.x, detailPos.y);
         foreach (var statusSubPanel in new[] { hp, mp })

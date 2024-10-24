@@ -155,10 +155,14 @@ public partial class BattleHUD : UIScene
         Single additionalWidth = 0.0f;
         switch (info)
         {
-            case LibraInformation.Name: return [Singleton<HelpDialog>.Instance.PhraseLabel.PhrasePreOpcodeSymbol(unit.Name, ref additionalWidth)];
-            case LibraInformation.Level: return [FF9TextTool.BattleLibraText(10) + unit.Level.ToString()];
-            case LibraInformation.HP: return [FF9TextTool.BattleLibraText(11) + unit.CurrentHp + FF9TextTool.BattleLibraText(13) + unit.MaximumHp];
-            case LibraInformation.MP: return [FF9TextTool.BattleLibraText(12) + unit.CurrentMp + FF9TextTool.BattleLibraText(13) + unit.MaximumMp];
+            case LibraInformation.Name:
+                return [Singleton<HelpDialog>.Instance.PhraseLabel.PhrasePreOpcodeSymbol(unit.Name, ref additionalWidth)];
+            case LibraInformation.Level:
+                return [FF9TextTool.BattleLibraText(10) + unit.Level.ToString()];
+            case LibraInformation.HP:
+                return [FF9TextTool.BattleLibraText(11) + unit.CurrentHp + FF9TextTool.BattleLibraText(13) + unit.MaximumHp];
+            case LibraInformation.MP:
+                return [FF9TextTool.BattleLibraText(12) + unit.CurrentMp + FF9TextTool.BattleLibraText(13) + unit.MaximumMp];
             case LibraInformation.Category:
                 if (!unit.IsPlayer)
                 {
@@ -185,16 +189,44 @@ public partial class BattleHUD : UIScene
             case LibraInformation.StatusAuto:
             case LibraInformation.StatusImmune:
             {
-                // TODO Make it so status sprites are displayed
-                //BattleStatus status = info == LibraInformation.StatusAuto ? unit.PermanentStatus : unit.ResistStatus;
-                //Dictionary<BattleStatusId, String> icons = info == LibraInformation.StatusAuto ? BattleHUD.BuffIconNames : BattleHUD.DebuffIconNames;
-                //foreach (BattleStatusId statusId in status.ToStatusList())
-                //    if (icons.TryGetValue(statusId, out String spriteName))
-                //        messages.Add(spriteName);
-                //if (messages.Count == 0)
-                //    return [];
-                //return [Localization.GetWithDefault(info.ToString()).Replace("%", String.Join(" ", messages.ToArray()))];
-                return [];
+                BattleStatus status = info == LibraInformation.StatusAuto ? unit.PermanentStatus : unit.ResistStatus;
+                Dictionary<BattleStatusId, String> icons = info == LibraInformation.StatusAuto ? BattleHUD.BuffIconNames : BattleHUD.DebuffIconNames;
+                foreach (BattleStatusId statusId in status.ToStatusList())
+                    if (icons.TryGetValue(statusId, out String spriteName))
+                        messages.Add($"[SPRT={spriteName},48,48]");
+                if (messages.Count == 0)
+                    return [];
+                if (messages.Count <= 10)
+                    return [Localization.GetWithDefault(info.ToString()).Replace("%", String.Join("  ", messages.ToArray())) + " "];
+                List<String> result = new List<String>();
+                result.Add(Localization.GetWithDefault(info.ToString()).Replace("%", String.Join("  ", messages.Take(10).ToArray())) + " ");
+                messages.RemoveRange(0, 10);
+                while (messages.Count > 0)
+                {
+                    result.Add("-" + String.Join("  ", messages.Take(10).ToArray()) + " -");
+                    messages.RemoveRange(0, Math.Min(10, messages.Count));
+                }
+                return result;
+            }
+            case LibraInformation.StatusResist:
+            {
+                String spriteName;
+                foreach (KeyValuePair<BattleStatusId, Single> resist in unit.PartialResistStatus)
+                    if (resist.Value > 0f && (BattleHUD.BuffIconNames.TryGetValue(resist.Key, out spriteName) || BattleHUD.DebuffIconNames.TryGetValue(resist.Key, out spriteName)))
+                        messages.Add($"[SPRT={spriteName},48,48]  ({(Int32)Math.Min(100, resist.Value * 100)}%)");
+                if (messages.Count == 0)
+                    return [];
+                if (messages.Count <= 10)
+                    return [Localization.GetWithDefault(info.ToString()).Replace("%", String.Join(", ", messages.ToArray())) + " "];
+                List<String> result = new List<String>();
+                result.Add(Localization.GetWithDefault(info.ToString()).Replace("%", String.Join("  ", messages.Take(10).ToArray())) + " ");
+                messages.RemoveRange(0, 10);
+                while (messages.Count > 0)
+                {
+                    result.Add("-" + String.Join("  ", messages.Take(10).ToArray()) + " -");
+                    messages.RemoveRange(0, Math.Min(10, messages.Count));
+                }
+                return result;
             }
             case LibraInformation.ItemSteal:
                 if (!unit.IsPlayer)
@@ -366,9 +398,7 @@ public partial class BattleHUD : UIScene
             id = _peepingEnmData.StealableItems[_currentPeepingReverseOrder ? _peepingEnmData.StealableItems.Length - stealIndex : stealIndex - 1];
         } while (id == RegularItem.NoItem);
 
-        SetBattleMessage(Localization.GetSymbol() != "JP"
-            ? FF9TextTool.BattleLibraText(8) + FF9TextTool.ItemName(id)
-            : FF9TextTool.ItemName(id) + FF9TextTool.BattleLibraText(8), 3);
+        SetBattleMessage(Localization.GetSymbol() != "JP" ? FF9TextTool.BattleLibraText(8) + FF9TextTool.ItemName(id) : FF9TextTool.ItemName(id) + FF9TextTool.BattleLibraText(8), 3);
         return true;
     }
 
@@ -949,6 +979,12 @@ public partial class BattleHUD : UIScene
                     if (_cursorType == CursorGroup.Individual)
                         ButtonGroupState.SetButtonEnable(labelObj, true);
                     nameLabel.color = unit.UIColorHP;
+                }
+                if (_targetCursor == TargetType.Self && unit.GetIndex() == CurrentPlayerIndex && currentTargetLabel != labelObj)
+                {
+                    Singleton<PointerManager>.Instance.RemovePointerFromGameObject(currentTargetLabel);
+                    _currentTargetIndex = unit.GetIndex();
+                    currentTargetLabel = labelObj;
                 }
                 ++playerIndex;
             }
@@ -1678,7 +1714,7 @@ public partial class BattleHUD : UIScene
             }
             else
             {
-                // Use the mix command with the non-registed request (it is added to the database with a negative ID)
+                // Use the mix command with the non-registered request (it is added to the database with a negative ID)
                 mixRequest.Id = -1 - CurrentPlayerIndex;
                 ff9mixitem.MixItemsData[mixRequest.Id] = mixRequest;
                 if (mixInfo.failType == FailedMixType.FAIL_ITEM)
@@ -1700,11 +1736,16 @@ public partial class BattleHUD : UIScene
     {
         switch (TargetType)
         {
-            case TargetType.AllAlly: return 0x0F;
-            case TargetType.AllEnemy: return 0xF0;
-            case TargetType.Everyone: return 0xFF;
-            case TargetType.Self: return cmd.regist.btl_id;
-            default: return cmddetail.TargetId;
+            case TargetType.AllAlly:
+                return 0x0F;
+            case TargetType.AllEnemy:
+                return 0xF0;
+            case TargetType.Everyone:
+                return 0xFF;
+            case TargetType.Self:
+                return cmd.regist.btl_id;
+            default:
+                return cmddetail.TargetId;
         }
     }
 
@@ -1867,6 +1908,8 @@ public partial class BattleHUD : UIScene
                     testCommand.ScriptId = btl_util.GetCommandScriptId(testCommand);
                     SelectBestTarget(targetType, testCommand);
                 }
+                else
+                    _targetDead = true; // Always true to target any player, whatever the result. (with a Mix Command)
             }
             else
             {
@@ -2666,7 +2709,7 @@ public partial class BattleHUD : UIScene
                 btl_stat.RemoveStatuses(swappedOut, FF9BattleDB.AllStatuses);
                 btl_sys.DelCharacter(swappedOut);
                 RemovePlayerFromAction(swappedOut.Id, true);
-                btl_cmd.KillCommand3(swappedOut);
+                btl_cmd.KillAllCommands(swappedOut);
                 btl_init.SwapPlayerCharacter(swappedOut, swappedIn);
                 AbilityPlayerDetail abilityPlayer = _abilityDetailDict[swappedOut.GetIndex()];
                 abilityPlayer.Player = swappedIn;

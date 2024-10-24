@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Assets.Scripts.Common;
 using Assets.Sources.Scripts.UI.Common;
 using FF9;
@@ -64,7 +65,7 @@ public static class battle
         FF9StateBattleSystem ff9Battle = FF9StateSystem.Battle.FF9Battle;
         battlebg.nf_InitBattleBG(ff9Battle.map.btlBGInfoPtr, ff9Battle.map.btlBGTexAnimPtr);
         ff9Battle.btl_load_status |= ff9btl.LOAD_BBG;
-        btl_cmd.InitCommandSystem(ff9Battle);
+        btl_cmd.InitCommandSystem(ff9Battle, true);
         btl_cmd.InitSelectCursor(ff9Battle);
         btlseq.SetupBattleScene();
         battle.btl_bonus.Event = ff9Battle.btl_scene.Info.AfterEvent;
@@ -173,7 +174,7 @@ public static class battle
         }
         if (!FF9StateSystem.Battle.isDebug)
             PersistenSingleton<EventEngine>.Instance.ServiceEvents();
-        if (ff9Battle.btl_phase == FF9StateBattleSystem.PHASE_NORMAL && ff9Battle.cur_cmd_list.Count == 0 && btl_scrp.GetBattleID(1u) == 0)
+        if (ff9Battle.btl_phase == FF9StateBattleSystem.PHASE_NORMAL && ff9Battle.cur_cmd_list.Count == 0 && btl_scrp.GetBattleID(1u) == 0 && BattleState.EnumerateUnits().Any(unit => !unit.IsUnderAnyStatus(BattleStatusConst.BattleEndFull)))
         {
             // Automatically end a battle when there is no enemy anymore, typically they escaped (warning: enemies that are not targetable but still present don't trigger the end)
             UIManager.Battle.FF9BMenu_EnableMenu(false);
@@ -234,6 +235,7 @@ public static class battle
         }
         btl_cmd.CommandEngine(btlsys);
         battle.BattleSubSystem(sys, btlsys);
+        btlseq.DispCharactersAppearedThisFrame();
     }
 
     private static Boolean BattleIdleLoop(FF9StateGlobal sys, FF9StateBattleSystem btlsys)
@@ -270,6 +272,7 @@ public static class battle
         if (btlsys.btl_phase == FF9StateBattleSystem.PHASE_DEFEAT && !btlsys.btl_scene.Info.NoGameOver && !btl_util.ManageBattleSong(sys, 30, 6))
             flag = false;
         battle.BattleSubSystem(sys, btlsys);
+        btlseq.DispCharactersAppearedThisFrame();
         return flag;
     }
 
@@ -360,6 +363,7 @@ public static class battle
         {
             btl_cmd.CommandEngine(btlsys);
             battle.BattleSubSystem(sys, btlsys);
+            btlseq.DispCharactersAppearedThisFrame();
             return;
         }
         switch (btlsys.btl_seq)
@@ -420,7 +424,7 @@ public static class battle
                     sys.btl_flag |= battle.BTL_CONTI_FLD_SONG;
                 btlsys.btl_phase = FF9StateBattleSystem.PHASE_EVENT;
                 btl_cmd.KillAllCommand(btlsys);
-                btl_cmd.InitCommandSystem(btlsys);
+                btl_cmd.InitCommandSystem(btlsys, false);
                 for (BTL_DATA next = btlsys.btl_list.next; next != null; next = next.next)
                 {
                     btl_cmd.InitCommand(next);
@@ -474,6 +478,7 @@ public static class battle
                 btlsys.btl_seq = FF9StateBattleSystem.SEQ_DEFEATCLOSE_FADEOUT;
         }
         battle.BattleSubSystem(sys, btlsys);
+        btlseq.DispCharactersAppearedThisFrame();
     }
 
     private static void BattleLoadLoop(FF9StateGlobal sys, FF9StateBattleSystem btlsys)
